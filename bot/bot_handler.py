@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, time as dt_time
 import pytz
 import re
 import os
+import asyncio
 
 DIGITAR_HORARIO = 0
 
@@ -27,6 +28,101 @@ async def verificar_grupo(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             return False
     except Exception:
         return False
+
+async def executar_agendamento(context: ContextTypes.DEFAULT_TYPE):
+    """Executa o agendamento quando disparado pelo job_queue"""
+    job = context.job
+    schedule = job.data
+    
+    try:
+        instance_id = schedule['instance_id']
+        action = schedule['action']
+        user_id = schedule['chat_id']
+        
+        mensagem_resultado = ""
+        
+        if instance_id == 'all':
+            if action == 'start':
+                results = ec2_manager.start_all_instances()
+            else:
+                results = ec2_manager.stop_all_instances()
+            
+            if results:
+                mensagem_resultado = f"✅ AGENDAMENTO EXECUTADO!\n\nAção: {action.upper()} TODAS\nResultados:\n" + "\n".join(results)
+            else:
+                mensagem_resultado = f"✅ AGENDAMENTO EXECUTADO!\n\nAção: {action.upper()} TODAS\nNenhuma instância processada."
+        else:
+            if action == 'start':
+                success, result = ec2_manager.start_instance(instance_id)
+            else:
+                success, result = ec2_manager.stop_instance(instance_id)
+            
+            if success:
+                mensagem_resultado = f"✅ AGENDAMENTO EXECUTADO!\n\nInstância: {instance_id}\nAção: {action.upper()}\nStatus: Sucesso"
+            else:
+                mensagem_resultado = f"✅ AGENDAMENTO EXECUTADO!\n\nInstância: {instance_id}\nAção: {action.upper()}\nStatus: {result}"
+        
+        try:
+            await context.bot.send_message(chat_id=user_id, text=mensagem_resultado)
+        except Exception as e:
+            print(f"Erro ao enviar mensagem: {e}")
+        
+        dias_semana = schedule.get('dias_semana', '')
+        horario = schedule.get('horario', '')
+        
+        if dias_semana and horario:
+            tz = pytz.timezone('America/Sao_Paulo')
+            agora = datetime.now(tz)
+            
+            for i in range(1, 8):
+                data_teste = agora + timedelta(days=i)
+                dias_numeros = [int(d) for d in dias_semana.split(',') if d]
+                
+                if data_teste.weekday() in dias_numeros:
+                    hora, minuto = map(int, horario.split(':'))
+                    data_agendamento = datetime.combine(data_teste.date(), dt_time(hora, minuto))
+                    data_agendamento = tz.localize(data_agendamento)
+                    data_agendamento_utc = data_agendamento.astimezone(pytz.UTC)
+                    
+                    if data_agendamento_utc > datetime.now(pytz.UTC):
+                        atraso = (data_agendamento_utc - datetime.now(pytz.UTC)).total_seconds()
+                        
+                        context.job_queue.run_once(
+                            executar_agendamento,
+                            when=atraso,
+                            name=str(schedule['id']),
+                            data=schedule
+                        )
+                        break
+        
+    except Exception as e:
+        print(f"Erro ao executar agendamento: {e}")
+        try:
+            await context.bot.send_message(
+                chat_id=schedule['chat_id'], 
+                text=f"❌ ERRO AO EXECUTAR AGENDAMENTO!\n\nErro: {str(e)}"
+            )
+        except:
+            pass
+
+def carregar_agendamentos(application: Application):
+    """Carrega todos os agendamentos do banco de dados ao iniciar"""
+    schedules = get_schedules()
+    agora_utc = datetime.now(pytz.UTC)
+    
+    for schedule in schedules:
+        schedule_time = schedule['schedule_time']
+        
+        if schedule_time > agora_utc:
+            atraso = (schedule_time - agora_utc).total_seconds()
+            
+            if atraso > 0:
+                application.job_queue.run_once(
+                    executar_agendamento,
+                    when=atraso,
+                    name=str(schedule['id']),
+                    data=schedule
+                )
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await verificar_grupo(update, context):
@@ -101,13 +197,24 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await escolher_horario_menu(query)
     elif data.startswith('delete_schedule_'):
         schedule_id = int(data.split('_')[2])
+        
+        jobs = context.job_queue.get_jobs_by_name(str(schedule_id))
+        for job in jobs:
+            job.schedule_removal()
+        
         if delete_schedule(schedule_id, query.from_user.id):
-            await query.edit_message_text(f"Agendamento {schedule_id} deletado.")
+            await query.edit_message_text(f"✅ Agendamento {schedule_id} deletado.")
         else:
-            await query.edit_message_text("Não foi possível deletar.")
+            await query.edit_message_text("❌ Não foi possível deletar.")
     elif data == 'delete_all_schedules':
+        schedules = get_schedules(query.from_user.id)
+        for schedule in schedules:
+            jobs = context.job_queue.get_jobs_by_name(str(schedule['id']))
+            for job in jobs:
+                job.schedule_removal()
+        
         count = delete_all_schedules(query.from_user.id)
-        await query.edit_message_text(f"{count} agendamentos deletados.")
+        await query.edit_message_text(f"✅ {count} agendamentos deletados.")
     elif data == 'back_to_main':
         await start_from_callback(update, context)
     elif data.startswith('hora_'):
@@ -123,7 +230,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == 'finalizar_dias':
         await mostrar_resumo_agendamento(query)
     elif data == 'confirmar_agendamento':
-        await confirmar_agendamento(query)
+        await confirmar_agendamento(query, context)
     elif data == 'cancelar_agendamento':
         user_id = query.from_user.id
         if user_id in user_schedule_data:
@@ -436,7 +543,7 @@ async def mostrar_resumo_agendamento(query):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-async def confirmar_agendamento(query):
+async def confirmar_agendamento(query, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     
     if user_id not in user_schedule_data:
@@ -468,6 +575,25 @@ async def confirmar_agendamento(query):
                 horario=dados['horario'].strftime("%H:%M")
             )
             
+            schedule_data = {
+                'id': schedule_id,
+                'chat_id': user_id,
+                'instance_id': dados['instance_id'],
+                'action': dados['action'],
+                'dias_semana': ','.join(map(str, dados['dias_semana'])),
+                'horario': dados['horario'].strftime("%H:%M")
+            }
+            
+            atraso = (data_agendamento_utc - datetime.now(pytz.UTC)).total_seconds()
+            
+            if atraso > 0:
+                context.job_queue.run_once(
+                    executar_agendamento,
+                    when=atraso,
+                    name=str(schedule_id),
+                    data=schedule_data
+                )
+            
             del user_schedule_data[user_id]
             
             data_formatada = data_agendamento.strftime("%d/%m/%Y às %H:%M")
@@ -481,8 +607,9 @@ async def confirmar_agendamento(query):
                 f"• Ação: {'START' if dados['action'] == 'start' else 'STOP'}\n"
                 f"• Horário: {dados['horario'].strftime('%H:%M')}\n"
                 f"• Dias: {dias_text}\n"
-                f"• Próxima: {data_formatada}\n\n"
-                f"ID: {schedule_id}"
+                f"• Próxima execução: {data_formatada}\n\n"
+                f"ID: {schedule_id}\n\n"
+                f"✅ Você será notificado quando executar!"
             )
             return
     
@@ -576,7 +703,7 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         if 'horario' not in user_schedule_data[user_id] or not user_schedule_data[user_id]['horario']:
             await handle_horario_digitado(update, context)
 
-def setup_handlers(application):
+def setup_handlers(application: Application):
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button_handler))
     
@@ -591,5 +718,6 @@ def setup_handlers(application):
     )
     
     application.add_handler(conv_handler)
-    
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_message))
+    
+    carregar_agendamentos(application)
