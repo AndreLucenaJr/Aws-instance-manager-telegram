@@ -238,13 +238,13 @@ async def show_instances_menu(query):
         ])
     
     keyboard.append([
-        InlineKeyboardButton("Iniciar Todas", callback_data='start_all'),
-        InlineKeyboardButton("Parar Todas", callback_data='stop_all')
+        InlineKeyboardButton("Start All", callback_data='start_all'),
+        InlineKeyboardButton("Stop All", callback_data='stop_all')
     ])
     keyboard.append([InlineKeyboardButton("Voltar", callback_data='back_to_main')])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text('Instâncias EC2:', reply_markup=reply_markup)
+    await query.edit_message_text('Instances EC2:', reply_markup=reply_markup)
 
 async def show_schedule_menu(query):
     instances = ec2_manager.get_all_instances()
@@ -260,7 +260,7 @@ async def show_schedule_menu(query):
         InlineKeyboardButton("📅 Todas - Start", callback_data='schedule_action_all_start'),
         InlineKeyboardButton("🛑 Todas - Stop", callback_data='schedule_action_all_stop')
     ])
-    keyboard.append([InlineKeyboardButton("Voltar", callback_data='back_to_main')])
+    keyboard.append([InlineKeyboardButton("Back", callback_data='back_to_main')])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text('Agendar ação para:', reply_markup=reply_markup)
