@@ -29,16 +29,26 @@ class EC2Manager:
     def start_instance(self, instance_id):
         try:
             instance = self.ec2.Instance(instance_id)
+            instance.load()
+            
+            if instance.state['Name'] == 'running':
+                return False, f"⚠️ Instância {instance_id} já está iniciada"
+            
             instance.start()
-            return True, f"Iniciando instância {instance_id}"
+            return True, f"⏳ Iniciando instância {instance_id}"
         except ClientError as e:
             return False, str(e)
 
     def stop_instance(self, instance_id):
         try:
             instance = self.ec2.Instance(instance_id)
+            instance.load()
+            
+            if instance.state['Name'] == 'stopped':
+                return False, f"⚠️ Instância {instance_id} já está parada"
+            
             instance.stop()
-            return True, f"Parando instância {instance_id}"
+            return True, f"⏳ Parando instância {instance_id}"
         except ClientError as e:
             return False, str(e)
 
@@ -50,6 +60,8 @@ class EC2Manager:
             if instance['state'] == 'stopped':
                 success, message = self.start_instance(instance['id'])
                 results.append(f"{instance['id']}: {message}")
+            elif instance['state'] == 'running':
+                results.append(f"⚠️ {instance['id']}: Instância já está iniciada")
         
         return results
 
@@ -61,5 +73,7 @@ class EC2Manager:
             if instance['state'] == 'running':
                 success, message = self.stop_instance(instance['id'])
                 results.append(f"{instance['id']}: {message}")
+            elif instance['state'] == 'stopped':
+                results.append(f"⚠️ {instance['id']}: Instância já está parada")
         
         return results
