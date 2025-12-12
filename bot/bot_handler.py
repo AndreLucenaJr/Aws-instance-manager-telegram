@@ -14,19 +14,7 @@ GRUPO_AUTORIZADO_ID = int(os.getenv('GRUPO_AUTORIZADO_ID'))
 user_schedule_data = {}
 
 async def verificar_grupo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    try:
-        user_id = update.effective_user.id
-        
-        if update.effective_chat.type in ['group', 'supergroup']:
-            return update.effective_chat.id == GRUPO_AUTORIZADO_ID
-        
-        try:
-            member = await context.bot.get_chat_member(GRUPO_AUTORIZADO_ID, user_id)
-            return member.status in ['member', 'administrator', 'creator']
-        except Exception:
-            return False
-    except Exception:
-        return False
+    return update.effective_chat.type in ['group', 'supergroup'] and update.effective_chat.id == GRUPO_AUTORIZADO_ID
 
 async def executar_agendamento(context: ContextTypes.DEFAULT_TYPE):
     job = context.job
@@ -59,10 +47,7 @@ async def executar_agendamento(context: ContextTypes.DEFAULT_TYPE):
             else:
                 mensagem_resultado = f"✅ AGENDAMENTO EXECUTADO!\n\nInstância: {instance_id}\nAção: {action.upper()}\nStatus: {result}"
         
-        try:
-            await context.bot.send_message(chat_id=GRUPO_AUTORIZADO_ID, text=mensagem_resultado)
-        except Exception as e:
-            print(f"Erro ao enviar mensagem: {e}")
+        await context.bot.send_message(chat_id=GRUPO_AUTORIZADO_ID, text=mensagem_resultado)
         
         dias_semana = schedule.get('dias_semana', '')
         horario = schedule.get('horario', '')
@@ -127,10 +112,6 @@ def carregar_agendamentos(application: Application):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await verificar_grupo(update, context):
-        if update.effective_chat.type == 'private':
-            await update.message.reply_text("❌ Este bot só pode ser usado no grupo autorizado.")
-        else:
-            await update.message.reply_text("❌ Este grupo não está autorizado a usar este bot.")
         return
     
     keyboard = [
@@ -285,7 +266,6 @@ async def show_schedule_menu(query):
     await query.edit_message_text('Agendar ação para:', reply_markup=reply_markup)
 
 async def ask_schedule_options(query, instance_id, action):
-    user_id = query.from_user.id
     instance_text = "Todas as instâncias" if instance_id == 'all' else f"Instância: {instance_id}"
     action_text = "▶️ START" if action == 'start' else "⏸️ STOP"
     
