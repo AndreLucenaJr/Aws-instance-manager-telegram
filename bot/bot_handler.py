@@ -10,11 +10,11 @@ import os
 DIGITAR_HORARIO = 0
 
 ec2_manager = EC2Manager()
-GRUPO_AUTORIZADO_ID = int(os.getenv('GRUPO_AUTORIZADO_ID'))
+AUTHORIZED_GROUP_ID = int(os.getenv('AUTHORIZED_GROUP_ID'))
 user_schedule_data = {}
 
 async def verificar_grupo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    return update.effective_chat.type in ['group', 'supergroup'] and update.effective_chat.id == GRUPO_AUTORIZADO_ID
+    return update.effective_chat.type in ['group', 'supergroup'] and update.effective_chat.id == AUTHORIZED_GROUP_ID
 
 async def executar_agendamento(context: ContextTypes.DEFAULT_TYPE):
     job = context.job
@@ -47,7 +47,7 @@ async def executar_agendamento(context: ContextTypes.DEFAULT_TYPE):
             else:
                 mensagem_resultado = f"✅ AGENDAMENTO EXECUTADO!\n\nInstância: {instance_id}\nAção: {action.upper()}\nStatus: {result}"
         
-        await context.bot.send_message(chat_id=GRUPO_AUTORIZADO_ID, text=mensagem_resultado)
+        await context.bot.send_message(chat_id=AUTHORIZED_GROUP_ID, text=mensagem_resultado)
         
         dias_semana = schedule.get('dias_semana', '')
         horario = schedule.get('horario', '')
@@ -82,7 +82,7 @@ async def executar_agendamento(context: ContextTypes.DEFAULT_TYPE):
         print(f"Erro ao executar agendamento: {e}")
         try:
             await context.bot.send_message(
-                chat_id=GRUPO_AUTORIZADO_ID, 
+                chat_id=AUTHORIZED_GROUP_ID, 
                 text=f"❌ ERRO AO EXECUTAR AGENDAMENTO!\n\nErro: {str(e)}"
             )
         except:
