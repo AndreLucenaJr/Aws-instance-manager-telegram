@@ -64,7 +64,7 @@ def check_and_fix_columns():
                 except Exception as e:
                     conn.rollback()
             else:
-                print(f"Coluna '{column_name}' já existe.")
+                break
         
         print("Verificação de colunas concluída!")
         

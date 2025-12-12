@@ -6,7 +6,6 @@ from datetime import datetime, timedelta, time as dt_time
 import pytz
 import re
 import os
-import asyncio
 
 DIGITAR_HORARIO = 0
 
@@ -30,14 +29,12 @@ async def verificar_grupo(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return False
 
 async def executar_agendamento(context: ContextTypes.DEFAULT_TYPE):
-    """Executa o agendamento quando disparado pelo job_queue"""
     job = context.job
     schedule = job.data
     
     try:
         instance_id = schedule['instance_id']
         action = schedule['action']
-        user_id = schedule['chat_id']
         
         mensagem_resultado = ""
         
@@ -63,7 +60,7 @@ async def executar_agendamento(context: ContextTypes.DEFAULT_TYPE):
                 mensagem_resultado = f"✅ AGENDAMENTO EXECUTADO!\n\nInstância: {instance_id}\nAção: {action.upper()}\nStatus: {result}"
         
         try:
-            await context.bot.send_message(chat_id=user_id, text=mensagem_resultado)
+            await context.bot.send_message(chat_id=GRUPO_AUTORIZADO_ID, text=mensagem_resultado)
         except Exception as e:
             print(f"Erro ao enviar mensagem: {e}")
         
@@ -87,42 +84,46 @@ async def executar_agendamento(context: ContextTypes.DEFAULT_TYPE):
                     if data_agendamento_utc > datetime.now(pytz.UTC):
                         atraso = (data_agendamento_utc - datetime.now(pytz.UTC)).total_seconds()
                         
-                        context.job_queue.run_once(
-                            executar_agendamento,
-                            when=atraso,
-                            name=str(schedule['id']),
-                            data=schedule
-                        )
+                        if context.application and context.application.job_queue:
+                            context.application.job_queue.run_once(
+                                executar_agendamento,
+                                when=atraso,
+                                name=str(schedule['id']),
+                                data=schedule
+                            )
                         break
         
     except Exception as e:
         print(f"Erro ao executar agendamento: {e}")
         try:
             await context.bot.send_message(
-                chat_id=schedule['chat_id'], 
+                chat_id=GRUPO_AUTORIZADO_ID, 
                 text=f"❌ ERRO AO EXECUTAR AGENDAMENTO!\n\nErro: {str(e)}"
             )
         except:
             pass
 
 def carregar_agendamentos(application: Application):
-    """Carrega todos os agendamentos do banco de dados ao iniciar"""
     schedules = get_schedules()
     agora_utc = datetime.now(pytz.UTC)
     
     for schedule in schedules:
         schedule_time = schedule['schedule_time']
         
-        if schedule_time > agora_utc:
-            atraso = (schedule_time - agora_utc).total_seconds()
+        if isinstance(schedule_time, datetime):
+            if schedule_time.tzinfo is None:
+                schedule_time = pytz.UTC.localize(schedule_time)
             
-            if atraso > 0:
-                application.job_queue.run_once(
-                    executar_agendamento,
-                    when=atraso,
-                    name=str(schedule['id']),
-                    data=schedule
-                )
+            if schedule_time > agora_utc:
+                atraso = (schedule_time - agora_utc).total_seconds()
+                
+                if atraso > 0:
+                    application.job_queue.run_once(
+                        executar_agendamento,
+                        when=atraso,
+                        name=str(schedule['id']),
+                        data=schedule
+                    )
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await verificar_grupo(update, context):
@@ -198,9 +199,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith('delete_schedule_'):
         schedule_id = int(data.split('_')[2])
         
-        jobs = context.job_queue.get_jobs_by_name(str(schedule_id))
-        for job in jobs:
-            job.schedule_removal()
+        if context.application and context.application.job_queue:
+            jobs = context.application.job_queue.get_jobs_by_name(str(schedule_id))
+            for job in jobs:
+                job.schedule_removal()
         
         if delete_schedule(schedule_id, query.from_user.id):
             await query.edit_message_text(f"✅ Agendamento {schedule_id} deletado.")
@@ -208,17 +210,16 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("❌ Não foi possível deletar.")
     elif data == 'delete_all_schedules':
         schedules = get_schedules(query.from_user.id)
-        for schedule in schedules:
-            jobs = context.job_queue.get_jobs_by_name(str(schedule['id']))
-            for job in jobs:
-                job.schedule_removal()
+        if context.application and context.application.job_queue:
+            for schedule in schedules:
+                jobs = context.application.job_queue.get_jobs_by_name(str(schedule['id']))
+                for job in jobs:
+                    job.schedule_removal()
         
         count = delete_all_schedules(query.from_user.id)
         await query.edit_message_text(f"✅ {count} agendamentos deletados.")
     elif data == 'back_to_main':
         await start_from_callback(update, context)
-    elif data.startswith('hora_'):
-        await handle_horario_selecionado(query, data)
     elif data == 'digitar_horario':
         await pedir_horario_digitado(query)
     elif data == 'voltar_horario':
@@ -289,7 +290,6 @@ async def ask_schedule_options(query, instance_id, action):
     action_text = "▶️ START" if action == 'start' else "⏸️ STOP"
     
     keyboard = [
-        [InlineKeyboardButton("⏰ Escolher Horário", callback_data='escolher_horario')],
         [InlineKeyboardButton("⌨️ Digitar Horário", callback_data='digitar_horario')],
         [InlineKeyboardButton("📅 Escolher Dias", callback_data='escolher_dias')],
         [InlineKeyboardButton("❌ Cancelar", callback_data='cancelar_agendamento')]
@@ -303,27 +303,10 @@ async def ask_schedule_options(query, instance_id, action):
     )
 
 async def escolher_horario_menu(query):
-    horarios_comuns = [
-        ('08:00', 'hora_08:00'),
-        ('09:00', 'hora_09:00'),
-        ('10:00', 'hora_10:00'),
-        ('12:00', 'hora_12:00'),
-        ('14:00', 'hora_14:00'),
-        ('16:00', 'hora_16:00'),
-        ('18:00', 'hora_18:00'),
-        ('20:00', 'hora_20:00'),
-        ('22:00', 'hora_22:00'),
+    keyboard = [
+        [InlineKeyboardButton("⌨️ Digitar horário", callback_data='digitar_horario')],
+        [InlineKeyboardButton("❌ Cancelar", callback_data='cancelar_agendamento')]
     ]
-    
-    keyboard = []
-    for i in range(0, len(horarios_comuns), 3):
-        linha = []
-        for texto, callback in horarios_comuns[i:i+3]:
-            linha.append(InlineKeyboardButton(texto, callback_data=callback))
-        keyboard.append(linha)
-    
-    keyboard.append([InlineKeyboardButton("⌨️ Digitar horário", callback_data='digitar_horario')])
-    keyboard.append([InlineKeyboardButton("❌ Cancelar", callback_data='cancelar_agendamento')])
     
     user_id = query.from_user.id
     instance_text = "Todas as instâncias"
@@ -335,7 +318,7 @@ async def escolher_horario_menu(query):
         action_text = "▶️ START" if dados['action'] == 'start' else "⏸️ STOP"
     
     await query.edit_message_text(
-        f"⏰ PASSO 1: SELECIONE O HORÁRIO\n\n{instance_text}\nAção: {action_text}\nEscolha um horário:",
+        f"⏰ PASSO 1: SELECIONE O HORÁRIO\n\n{instance_text}\nAção: {action_text}\nClique em 'Digitar horário' para inserir o horário:",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -412,18 +395,6 @@ async def escolher_dias_semana_menu_after_digitado(update, user_id, horario_text
         f"📅 PASSO 2: SELECIONE OS DIAS\n\n{instance_text}\nAção: {action_text}\nHorário: {horario_texto}",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
-
-async def handle_horario_selecionado(query, data):
-    user_id = query.from_user.id
-    horario_str = data.replace('hora_', '')
-    hora, minuto = map(int, horario_str.split(':'))
-    horario = dt_time(hora, minuto)
-    
-    if user_id in user_schedule_data:
-        user_schedule_data[user_id]['horario'] = horario
-        await escolher_dias_semana_menu(query)
-    else:
-        await query.edit_message_text("❌ Sessão expirada.")
 
 async def escolher_dias_semana_menu(query):
     user_id = query.from_user.id
@@ -525,7 +496,7 @@ async def mostrar_resumo_agendamento(query):
     keyboard = []
     if not completo:
         if not dados['horario']:
-            keyboard.append([InlineKeyboardButton("⏰ Definir Horário", callback_data='voltar_horario')])
+            keyboard.append([InlineKeyboardButton("⌨️ Digitar Horário", callback_data='voltar_horario')])
         if not dados['dias_semana']:
             keyboard.append([InlineKeyboardButton("📅 Definir Dias", callback_data='escolher_dias')])
     else:
@@ -586,8 +557,8 @@ async def confirmar_agendamento(query, context: ContextTypes.DEFAULT_TYPE):
             
             atraso = (data_agendamento_utc - datetime.now(pytz.UTC)).total_seconds()
             
-            if atraso > 0:
-                context.job_queue.run_once(
+            if atraso > 0 and context.application and context.application.job_queue:
+                context.application.job_queue.run_once(
                     executar_agendamento,
                     when=atraso,
                     name=str(schedule_id),
@@ -654,14 +625,21 @@ async def show_schedules(query):
     schedules = get_schedules(user_id)
     
     if not schedules:
-        await query.edit_message_text("Nenhum agendamento encontrado.")
+        keyboard = [
+            [InlineKeyboardButton("↩️ Voltar", callback_data='back_to_main')]
+        ]
+        await query.edit_message_text("📭 Nenhum agendamento encontrado.", reply_markup=InlineKeyboardMarkup(keyboard))
         return
     
     message = "📅 AGENDAMENTOS:\n\n"
     
     for schedule in schedules:
-        schedule_time = schedule['schedule_time'].astimezone(pytz.timezone('America/Sao_Paulo'))
-        horario_agendamento = schedule['horario'] if 'horario' in schedule and schedule['horario'] else schedule_time.strftime('%H:%M')
+        schedule_time = schedule['schedule_time']
+        if isinstance(schedule_time, datetime) and schedule_time.tzinfo is None:
+            schedule_time = pytz.UTC.localize(schedule_time)
+        
+        schedule_time_local = schedule_time.astimezone(pytz.timezone('America/Sao_Paulo'))
+        horario_agendamento = schedule['horario'] if 'horario' in schedule and schedule['horario'] else schedule_time_local.strftime('%H:%M')
         
         dias_text = ""
         if 'dias_semana' in schedule and schedule['dias_semana']:
@@ -678,7 +656,7 @@ async def show_schedules(query):
         message += f"• Horário: {horario_agendamento}\n"
         if dias_text:
             message += dias_text
-        message += f"• Próxima: {schedule_time.strftime('%d/%m')}\n"
+        message += f"• Próxima: {schedule_time_local.strftime('%d/%m')}\n"
         message += "-" * 30 + "\n"
     
     keyboard = []
@@ -712,9 +690,7 @@ def setup_handlers(application: Application):
         states={
             DIGITAR_HORARIO: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_horario_digitado)]
         },
-        fallbacks=[CommandHandler('cancelar', lambda update, context: ConversationHandler.END)],
-        allow_reentry=True,
-        per_message=False
+        fallbacks=[CommandHandler('cancelar', lambda update, context: ConversationHandler.END)]
     )
     
     application.add_handler(conv_handler)
