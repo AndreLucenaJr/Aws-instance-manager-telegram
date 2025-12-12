@@ -1,5 +1,4 @@
 # main.py
-import asyncio
 from telegram.ext import Application
 from config import TELEGRAM_BOT_TOKEN
 from bot.bot_handler import setup_handlers

@@ -49,6 +49,7 @@ class EC2Manager:
             
             instance.stop()
             return True, f"⏳ Parando instância {instance_id}"
+
         except ClientError as e:
             return False, str(e)
 
