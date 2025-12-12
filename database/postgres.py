@@ -3,13 +3,11 @@ from psycopg2.extras import RealDictCursor
 from config import DATABASE_URL
 
 def init_db():
-    """Inicializa o banco de dados e cria a tabela se não existir"""
     conn = psycopg2.connect(DATABASE_URL)
-    conn.autocommit = True  # Importante: ativa autocommit
+    conn.autocommit = True  
     cur = conn.cursor()
     
     try:
-        # Cria a tabela com todas as colunas
         cur.execute('''
             CREATE TABLE IF NOT EXISTS schedules (
                 id SERIAL PRIMARY KEY,
