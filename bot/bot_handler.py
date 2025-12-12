@@ -33,9 +33,9 @@ async def executar_agendamento(context: ContextTypes.DEFAULT_TYPE):
                 results = ec2_manager.stop_all_instances()
             
             if results:
-                mensagem_resultado = f"✅ AGENDAMENTO EXECUTADO!\n\nAção: {action.upper()} TODAS\nResultados:\n" + "\n".join(results)
+                mensagem_resultado = f"✅ SCHEDULE EXECUTED!\n\nAção: {action.upper()} TODAS\nResultados:\n" + "\n".join(results)
             else:
-                mensagem_resultado = f"✅ AGENDAMENTO EXECUTADO!\n\nAção: {action.upper()} TODAS\nNenhuma instância processada."
+                mensagem_resultado = f"✅ SCHEDULE EXECUTED!\n\nAção: {action.upper()} TODAS\nNenhuma instância processada."
         else:
             if action == 'start':
                 success, result = ec2_manager.start_instance(instance_id)
@@ -43,9 +43,9 @@ async def executar_agendamento(context: ContextTypes.DEFAULT_TYPE):
                 success, result = ec2_manager.stop_instance(instance_id)
             
             if success:
-                mensagem_resultado = f"✅ AGENDAMENTO EXECUTADO!\n\nInstância: {instance_id}\nAção: {action.upper()}\nStatus: Sucesso"
+                mensagem_resultado = f"✅ SCHEDULE EXECUTED!\n\nInstância: {instance_id}\nAção: {action.upper()}\nStatus: Sucesso"
             else:
-                mensagem_resultado = f"✅ AGENDAMENTO EXECUTADO!\n\nInstância: {instance_id}\nAção: {action.upper()}\nStatus: {result}"
+                mensagem_resultado = f"✅ SCHEDULE EXECUTED!\n\nInstância: {instance_id}\nAção: {action.upper()}\nStatus: {result}"
         
         await context.bot.send_message(chat_id=AUTHORIZED_GROUP_ID, text=mensagem_resultado)
         
@@ -79,11 +79,11 @@ async def executar_agendamento(context: ContextTypes.DEFAULT_TYPE):
                         break
         
     except Exception as e:
-        print(f"Erro ao executar agendamento: {e}")
+        print(f"ERROR EXECUTING SCHEDULE: {e}")
         try:
             await context.bot.send_message(
                 chat_id=AUTHORIZED_GROUP_ID, 
-                text=f"❌ ERRO AO EXECUTAR AGENDAMENTO!\n\nErro: {str(e)}"
+                text=f"❌ ERROR EXECUTING SCHEDULE!\n\nErro: {str(e)}"
             )
         except:
             pass
@@ -115,35 +115,35 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     keyboard = [
-        [InlineKeyboardButton("Gerenciar Instâncias", callback_data='manage_instances')],
-        [InlineKeyboardButton("Agendar Tarefas", callback_data='schedule_menu')],
-        [InlineKeyboardButton("Ver Agendamentos", callback_data='view_schedules')]
+        [InlineKeyboardButton("Manage Instances", callback_data='manage_instances')],
+        [InlineKeyboardButton("Schedule Tasks", callback_data='schedule_menu')],
+        [InlineKeyboardButton("View Schedules", callback_data='view_schedules')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text('Escolha uma opção:', reply_markup=reply_markup)
+    await update.message.reply_text('Choose an option:', reply_markup=reply_markup)
 
 async def start_from_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     
     if not await verificar_grupo(update, context):
-        await query.answer("❌ Acesso negado.", show_alert=True)
+        await query.answer("❌ Access Denied.", show_alert=True)
         return
     
     await query.answer()
     
     keyboard = [
-        [InlineKeyboardButton("Gerenciar Instâncias", callback_data='manage_instances')],
-        [InlineKeyboardButton("Agendar Tarefas", callback_data='schedule_menu')],
-        [InlineKeyboardButton("Ver Agendamentos", callback_data='view_schedules')]
+        [InlineKeyboardButton("Manage Instances", callback_data='manage_instances')],
+        [InlineKeyboardButton("Schedule Tasks", callback_data='schedule_menu')],
+        [InlineKeyboardButton("View Schedules", callback_data='view_schedules')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text('Escolha uma opção:', reply_markup=reply_markup)
+    await query.edit_message_text('Choose an option:', reply_markup=reply_markup)
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     
     if not await verificar_grupo(update, context):
-        await query.answer("❌ Acesso negado.", show_alert=True)
+        await query.answer("❌ Access Denied.", show_alert=True)
         return
     
     await query.answer()
@@ -186,9 +186,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 job.schedule_removal()
         
         if delete_schedule(schedule_id, query.from_user.id):
-            await query.edit_message_text(f"✅ Agendamento {schedule_id} deletado.")
+            await query.edit_message_text(f"✅ Schedule {schedule_id} deleted.")
         else:
-            await query.edit_message_text("❌ Não foi possível deletar.")
+            await query.edit_message_text("❌ It was not possible to delete..")
     elif data == 'delete_all_schedules':
         schedules = get_schedules(query.from_user.id)
         if context.application and context.application.job_queue:
@@ -198,7 +198,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     job.schedule_removal()
         
         count = delete_all_schedules(query.from_user.id)
-        await query.edit_message_text(f"✅ {count} agendamentos deletados.")
+        await query.edit_message_text(f"✅ {count} deleted schedules.")
     elif data == 'back_to_main':
         await start_from_callback(update, context)
     elif data == 'digitar_horario':
