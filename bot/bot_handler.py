@@ -260,7 +260,7 @@ async def show_schedule_menu(query):
         InlineKeyboardButton("📅 Todas - Start", callback_data='schedule_action_all_start'),
         InlineKeyboardButton("🛑 Todas - Stop", callback_data='schedule_action_all_stop')
     ])
-    keyboard.append([InlineKeyboardButton("Back", callback_data='back_to_main')])
+    keyboard.append([InlineKeyboardButton("Voltar", callback_data='back_to_main')])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text('Agendar ação para:', reply_markup=reply_markup)

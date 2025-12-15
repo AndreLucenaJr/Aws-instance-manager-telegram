@@ -1,9 +1,9 @@
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from config import DATABASE_URL
+from config import POSTGRES_URL
 
 def init_db():
-    conn = psycopg2.connect(DATABASE_URL)
+    conn = psycopg2.connect(POSTGRES_URL)
     conn.autocommit = True  
     cur = conn.cursor()
     
@@ -31,7 +31,7 @@ def init_db():
         conn.close()
 
 def check_and_fix_columns():
-    conn = psycopg2.connect(DATABASE_URL)
+    conn = psycopg2.connect(POSTGRES_URL)
     conn.autocommit = True 
     cur = conn.cursor()
     
@@ -76,7 +76,7 @@ def check_and_fix_columns():
         conn.close()
 
 def add_schedule(chat_id, instance_id, action, schedule_time, dias_semana=None, horario=None, repetir=False):
-    conn = psycopg2.connect(DATABASE_URL)
+    conn = psycopg2.connect(POSTGRES_URL)
     cur = conn.cursor()
     
     try:
@@ -117,7 +117,7 @@ def add_schedule(chat_id, instance_id, action, schedule_time, dias_semana=None, 
 
 def force_recreate_table():
 
-    conn = psycopg2.connect(DATABASE_URL)
+    conn = psycopg2.connect(POSTGRES_URL)
     conn.autocommit = True
     cur = conn.cursor()
     
@@ -156,7 +156,7 @@ def force_recreate_table():
         conn.close()
 
 def get_schedules(chat_id=None):
-    conn = psycopg2.connect(DATABASE_URL)
+    conn = psycopg2.connect(POSTGRES_URL)
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
@@ -175,7 +175,7 @@ def get_schedules(chat_id=None):
         conn.close()
 
 def get_repeating_schedules():
-    conn = psycopg2.connect(DATABASE_URL)
+    conn = psycopg2.connect(POSTGRES_URL)
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
@@ -190,7 +190,7 @@ def get_repeating_schedules():
         conn.close()
 
 def update_next_schedule_time(schedule_id, next_time):
-    conn = psycopg2.connect(DATABASE_URL)
+    conn = psycopg2.connect(POSTGRES_URL)
     cur = conn.cursor()
     
     try:
@@ -209,7 +209,7 @@ def update_next_schedule_time(schedule_id, next_time):
         conn.close()
 
 def delete_schedule(schedule_id, chat_id):
-    conn = psycopg2.connect(DATABASE_URL)
+    conn = psycopg2.connect(POSTGRES_URL)
     cur = conn.cursor()
     try:
         cur.execute('DELETE FROM schedules WHERE id = %s AND chat_id = %s', (schedule_id, chat_id))
@@ -225,7 +225,7 @@ def delete_schedule(schedule_id, chat_id):
         conn.close()
 
 def delete_all_schedules(chat_id):
-    conn = psycopg2.connect(DATABASE_URL)
+    conn = psycopg2.connect(POSTGRES_URL)
     cur = conn.cursor()
     try:
         cur.execute('DELETE FROM schedules WHERE chat_id = %s', (chat_id,))
@@ -241,7 +241,7 @@ def delete_all_schedules(chat_id):
         conn.close()
 
 def get_schedule_by_id(schedule_id):
-    conn = psycopg2.connect(DATABASE_URL)
+    conn = psycopg2.connect(POSTGRES_URL)
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
