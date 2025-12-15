@@ -20,15 +20,13 @@ docker logs aws-ec2-manager-bot -f
 Use env-example as a base
 
 ```env
-TELEGRAM_TOKEN=
-AUTHORIZED_GROUP_ID=
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
-AWS_REGION=
-DB_HOST=
-DB_NAME=
-DB_USER=
-DB_PASSWORD=
+TELEGRAM_BOT_TOKEN= ## Add your telegram bot token
+AWS_ACCESS_KEY_ID=  ## Add your user aws acces key id
+AWS_SECRET_ACCESS_KEY= ## Add your user aws secret access key
+AWS_REGION= ## Add your aws region
+POSTGRES_URL= postgresql://[user]:[password]@[host]:[port]/[db]
+AUTHORIZED_GROUP_ID= ## ID of the Telegram group in which the bot will be active and respond to messages.
+INSTANCES_TO_IGNORE= ## Comma-separated list of AWS instance IDs that the bot should ignore during processing.
 ```
 
 ##  How to Get Credentials
