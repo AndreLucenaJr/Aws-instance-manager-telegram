@@ -7,11 +7,14 @@ import pytz
 import re
 import os
 
-DIGITAR_HORARIO = 0
+SET_TIME = 0
 
 ec2_manager = EC2Manager()
 AUTHORIZED_GROUP_ID = int(os.getenv('AUTHORIZED_GROUP_ID'))
 user_schedule_data = {}
+
+WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+WEEKDAYS_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 async def verificar_grupo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     return update.effective_chat.type in ['group', 'supergroup'] and update.effective_chat.id == AUTHORIZED_GROUP_ID
@@ -24,8 +27,6 @@ async def executar_agendamento(context: ContextTypes.DEFAULT_TYPE):
         instance_id = schedule['instance_id']
         action = schedule['action']
         
-        mensagem_resultado = ""
-        
         if instance_id == 'all':
             if action == 'start':
                 results = ec2_manager.start_all_instances()
@@ -33,9 +34,9 @@ async def executar_agendamento(context: ContextTypes.DEFAULT_TYPE):
                 results = ec2_manager.stop_all_instances()
             
             if results:
-                mensagem_resultado = f"✅ SCHEDULE EXECUTED!\n\nAção: {action.upper()} TODAS\nResultados:\n" + "\n".join(results)
+                mensagem_resultado = f"✅ SCHEDULE EXECUTED!\n\nAction: {action.upper()} ALL\nResults:\n" + "\n".join(results)
             else:
-                mensagem_resultado = f"✅ SCHEDULE EXECUTED!\n\nAção: {action.upper()} TODAS\nNenhuma instância processada."
+                mensagem_resultado = f"✅ SCHEDULE EXECUTED!\n\nAction: {action.upper()} ALL\nNo instances processed."
         else:
             if action == 'start':
                 success, result = ec2_manager.start_instance(instance_id)
@@ -43,9 +44,9 @@ async def executar_agendamento(context: ContextTypes.DEFAULT_TYPE):
                 success, result = ec2_manager.stop_instance(instance_id)
             
             if success:
-                mensagem_resultado = f"✅ SCHEDULE EXECUTED!\n\nInstância: {instance_id}\nAção: {action.upper()}\nStatus: Sucesso"
+                mensagem_resultado = f"✅ SCHEDULE EXECUTED!\n\nInstance: {instance_id}\nAction: {action.upper()}\nStatus: Success"
             else:
-                mensagem_resultado = f"✅ SCHEDULE EXECUTED!\n\nInstância: {instance_id}\nAção: {action.upper()}\nStatus: {result}"
+                mensagem_resultado = f"✅ SCHEDULE EXECUTED!\n\nInstance: {instance_id}\nAction: {action.upper()}\nStatus: {result}"
         
         await context.bot.send_message(chat_id=AUTHORIZED_GROUP_ID, text=mensagem_resultado)
         
@@ -83,7 +84,7 @@ async def executar_agendamento(context: ContextTypes.DEFAULT_TYPE):
         try:
             await context.bot.send_message(
                 chat_id=AUTHORIZED_GROUP_ID, 
-                text=f"❌ ERROR EXECUTING SCHEDULE!\n\nErro: {str(e)}"
+                text=f"❌ ERROR EXECUTING SCHEDULE!\n\nError: {str(e)}"
             )
         except:
             pass
@@ -188,7 +189,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if delete_schedule(schedule_id, query.from_user.id):
             await query.edit_message_text(f"✅ Schedule {schedule_id} deleted.")
         else:
-            await query.edit_message_text("❌ It was not possible to delete..")
+            await query.edit_message_text("❌ Could not delete.")
     elif data == 'delete_all_schedules':
         schedules = get_schedules(query.from_user.id)
         if context.application and context.application.job_queue:
@@ -198,7 +199,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     job.schedule_removal()
         
         count = delete_all_schedules(query.from_user.id)
-        await query.edit_message_text(f"✅ {count} deleted schedules.")
+        await query.edit_message_text(f"✅ {count} schedules deleted.")
     elif data == 'back_to_main':
         await start_from_callback(update, context)
     elif data == 'digitar_horario':
@@ -217,7 +218,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = query.from_user.id
         if user_id in user_schedule_data:
             del user_schedule_data[user_id]
-        await query.edit_message_text("❌ Cancelado.")
+        await query.edit_message_text("❌ Canceled.")
     elif data == 'escolher_horario':
         await escolher_horario_menu(query)
     elif data == 'escolher_dias':
@@ -241,10 +242,10 @@ async def show_instances_menu(query):
         InlineKeyboardButton("Start All", callback_data='start_all'),
         InlineKeyboardButton("Stop All", callback_data='stop_all')
     ])
-    keyboard.append([InlineKeyboardButton("Voltar", callback_data='back_to_main')])
+    keyboard.append([InlineKeyboardButton("Back", callback_data='back_to_main')])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text('Instances EC2:', reply_markup=reply_markup)
+    await query.edit_message_text('EC2 Instances:', reply_markup=reply_markup)
 
 async def show_schedule_menu(query):
     instances = ec2_manager.get_all_instances()
@@ -257,54 +258,54 @@ async def show_schedule_menu(query):
         ])
     
     keyboard.append([
-        InlineKeyboardButton("📅 Todas - Start", callback_data='schedule_action_all_start'),
-        InlineKeyboardButton("🛑 Todas - Stop", callback_data='schedule_action_all_stop')
+        InlineKeyboardButton("📅 All - Start", callback_data='schedule_action_all_start'),
+        InlineKeyboardButton("🛑 All - Stop", callback_data='schedule_action_all_stop')
     ])
-    keyboard.append([InlineKeyboardButton("Voltar", callback_data='back_to_main')])
+    keyboard.append([InlineKeyboardButton("Back", callback_data='back_to_main')])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text('Agendar ação para:', reply_markup=reply_markup)
+    await query.edit_message_text('Schedule action for:', reply_markup=reply_markup)
 
 async def ask_schedule_options(query, instance_id, action):
-    instance_text = "Todas as instâncias" if instance_id == 'all' else f"Instância: {instance_id}"
+    instance_text = "All instances" if instance_id == 'all' else f"Instance: {instance_id}"
     action_text = "▶️ START" if action == 'start' else "⏸️ STOP"
     
     keyboard = [
-        [InlineKeyboardButton("⌨️ Digitar Horário", callback_data='digitar_horario')],
-        [InlineKeyboardButton("📅 Escolher Dias", callback_data='escolher_dias')],
-        [InlineKeyboardButton("❌ Cancelar", callback_data='cancelar_agendamento')]
+        [InlineKeyboardButton("⌨️ Enter Time", callback_data='digitar_horario')],
+        [InlineKeyboardButton("📅 Choose Days", callback_data='escolher_dias')],
+        [InlineKeyboardButton("❌ Cancel", callback_data='cancelar_agendamento')]
     ]
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await query.edit_message_text(
-        f"📋 Configurar Agendamento\n{instance_text}\nAção: {action_text}\nConfigure o agendamento:",
+        f"📋 Configure Schedule\n{instance_text}\nAction: {action_text}\nConfigure schedule:",
         reply_markup=reply_markup
     )
 
 async def escolher_horario_menu(query):
     keyboard = [
-        [InlineKeyboardButton("⌨️ Digitar horário", callback_data='digitar_horario')],
-        [InlineKeyboardButton("❌ Cancelar", callback_data='cancelar_agendamento')]
+        [InlineKeyboardButton("⌨️ Enter Time", callback_data='digitar_horario')],
+        [InlineKeyboardButton("❌ Cancel", callback_data='cancelar_agendamento')]
     ]
     
     user_id = query.from_user.id
-    instance_text = "Todas as instâncias"
+    instance_text = "All instances"
     action_text = "START"
     
     if user_id in user_schedule_data:
         dados = user_schedule_data[user_id]
-        instance_text = "Todas" if dados['instance_id'] == 'all' else f"Instância: {dados['instance_id']}"
+        instance_text = "All" if dados['instance_id'] == 'all' else f"Instance: {dados['instance_id']}"
         action_text = "▶️ START" if dados['action'] == 'start' else "⏸️ STOP"
     
     await query.edit_message_text(
-        f"⏰ PASSO 1: SELECIONE O HORÁRIO\n\n{instance_text}\nAção: {action_text}\nClique em 'Digitar horário' para inserir o horário:",
+        f"⏰ STEP 1: SELECT TIME\n\n{instance_text}\nAction: {action_text}\nClick 'Enter Time' to set time:",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
 async def pedir_horario_digitado(query):
-    await query.edit_message_text("⌨️ Digite o horário (HH:MM):\nEx: 09:30, 14:00\n/cancelar para cancelar.")
-    return DIGITAR_HORARIO
+    await query.edit_message_text("⌨️ Enter time (HH:MM):\nExample: 09:30, 14:00\n/cancel to cancel.")
+    return SET_TIME
 
 async def handle_horario_digitado(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await verificar_grupo(update, context):
@@ -313,10 +314,10 @@ async def handle_horario_digitado(update: Update, context: ContextTypes.DEFAULT_
     user_id = update.message.from_user.id
     horario_texto = update.message.text.strip()
     
-    if horario_texto.lower() == '/cancelar':
+    if horario_texto.lower() == '/cancel':
         if user_id in user_schedule_data:
             del user_schedule_data[user_id]
-        await update.message.reply_text("❌ Cancelado.")
+        await update.message.reply_text("❌ Canceled.")
         return ConversationHandler.END
     
     if re.match(r'^(0[0-9]|1[0-9]|2[0-3]):([0-5][0-9])$', horario_texto):
@@ -325,54 +326,54 @@ async def handle_horario_digitado(update: Update, context: ContextTypes.DEFAULT_
         
         if user_id in user_schedule_data:
             user_schedule_data[user_id]['horario'] = horario
-            await update.message.reply_text(f"✅ Horário: {horario_texto}")
+            await update.message.reply_text(f"✅ Time: {horario_texto}")
             
             await escolher_dias_semana_menu_after_digitado(update, user_id, horario_texto)
         else:
-            await update.message.reply_text("❌ Sessão expirada.")
+            await update.message.reply_text("❌ Session expired.")
     else:
-        await update.message.reply_text("❌ Formato inválido! Use HH:MM")
-        return DIGITAR_HORARIO
+        await update.message.reply_text("❌ Invalid format! Use HH:MM")
+        return SET_TIME
     
     return ConversationHandler.END
 
 async def escolher_dias_semana_menu_after_digitado(update, user_id, horario_texto):
     if user_id not in user_schedule_data:
-        await update.message.reply_text("❌ Sessão expirada.")
+        await update.message.reply_text("❌ Session expired.")
         return
     
     dados = user_schedule_data[user_id]
-    dias = [
-        ('Segunda', 0, 'dia_0'),
-        ('Terça', 1, 'dia_1'),
-        ('Quarta', 2, 'dia_2'),
-        ('Quinta', 3, 'dia_3'),
-        ('Sexta', 4, 'dia_4'),
-        ('Sábado', 5, 'dia_5'),
-        ('Domingo', 6, 'dia_6'),
+    dias_menu_items = [
+        (WEEKDAYS[0], 0, 'dia_0'),
+        (WEEKDAYS[1], 1, 'dia_1'),
+        (WEEKDAYS[2], 2, 'dia_2'),
+        (WEEKDAYS[3], 3, 'dia_3'),
+        (WEEKDAYS[4], 4, 'dia_4'),
+        (WEEKDAYS[5], 5, 'dia_5'),
+        (WEEKDAYS[6], 6, 'dia_6'),
     ]
     
     keyboard = []
-    for nome_dia, numero_dia, callback in dias:
+    for nome_dia, numero_dia, callback in dias_menu_items:
         emoji = '✅' if numero_dia in dados.get('dias_semana', []) else '⬜'
         keyboard.append([InlineKeyboardButton(f"{emoji} {nome_dia}", callback_data=callback)])
     
     keyboard.append([
-        InlineKeyboardButton("✅ Dias Úteis", callback_data='dias_uteis'),
-        InlineKeyboardButton("🏖️ Fim de Semana", callback_data='fins_semana'),
-        InlineKeyboardButton("📅 Todos", callback_data='todos_dias')
+        InlineKeyboardButton("✅ Business Days", callback_data='dias_uteis'),
+        InlineKeyboardButton("🏖️ Weekend", callback_data='fins_semana'),
+        InlineKeyboardButton("📅 All Days", callback_data='todos_dias')
     ])
     
     keyboard.append([
-        InlineKeyboardButton("✅ Finalizar", callback_data='finalizar_dias'),
-        InlineKeyboardButton("↩️ Voltar", callback_data='voltar_horario')
+        InlineKeyboardButton("✅ Finish", callback_data='finalizar_dias'),
+        InlineKeyboardButton("↩️ Back", callback_data='voltar_horario')
     ])
     
-    instance_text = "Todas" if dados['instance_id'] == 'all' else f"Instância: {dados['instance_id']}"
+    instance_text = "All" if dados['instance_id'] == 'all' else f"Instance: {dados['instance_id']}"
     action_text = "▶️ START" if dados['action'] == 'start' else "⏸️ STOP"
     
     await update.message.reply_text(
-        f"📅 PASSO 2: SELECIONE OS DIAS\n\n{instance_text}\nAção: {action_text}\nHorário: {horario_texto}",
+        f"📅 STEP 2: SELECT DAYS\n\n{instance_text}\nAction: {action_text}\nTime: {horario_texto}",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -380,42 +381,42 @@ async def escolher_dias_semana_menu(query):
     user_id = query.from_user.id
     
     if user_id not in user_schedule_data:
-        await query.edit_message_text("❌ Sessão expirada.")
+        await query.edit_message_text("❌ Session expired.")
         return
     
     dados = user_schedule_data[user_id]
-    dias = [
-        ('Segunda', 0, 'dia_0'),
-        ('Terça', 1, 'dia_1'),
-        ('Quarta', 2, 'dia_2'),
-        ('Quinta', 3, 'dia_3'),
-        ('Sexta', 4, 'dia_4'),
-        ('Sábado', 5, 'dia_5'),
-        ('Domingo', 6, 'dia_6'),
+    dias_menu_items = [
+        (WEEKDAYS[0], 0, 'dia_0'),
+        (WEEKDAYS[1], 1, 'dia_1'),
+        (WEEKDAYS[2], 2, 'dia_2'),
+        (WEEKDAYS[3], 3, 'dia_3'),
+        (WEEKDAYS[4], 4, 'dia_4'),
+        (WEEKDAYS[5], 5, 'dia_5'),
+        (WEEKDAYS[6], 6, 'dia_6'),
     ]
     
     keyboard = []
-    for nome_dia, numero_dia, callback in dias:
+    for nome_dia, numero_dia, callback in dias_menu_items:
         emoji = '✅' if numero_dia in dados.get('dias_semana', []) else '⬜'
         keyboard.append([InlineKeyboardButton(f"{emoji} {nome_dia}", callback_data=callback)])
     
     keyboard.append([
-        InlineKeyboardButton("✅ Dias Úteis", callback_data='dias_uteis'),
-        InlineKeyboardButton("🏖️ Fim de Semana", callback_data='fins_semana'),
-        InlineKeyboardButton("📅 Todos", callback_data='todos_dias')
+        InlineKeyboardButton("✅ Business Days", callback_data='dias_uteis'),
+        InlineKeyboardButton("🏖️ Weekend", callback_data='fins_semana'),
+        InlineKeyboardButton("📅 All Days", callback_data='todos_dias')
     ])
     
     keyboard.append([
-        InlineKeyboardButton("✅ Finalizar", callback_data='finalizar_dias'),
-        InlineKeyboardButton("↩️ Voltar", callback_data='voltar_horario')
+        InlineKeyboardButton("✅ Finish", callback_data='finalizar_dias'),
+        InlineKeyboardButton("↩️ Back", callback_data='voltar_horario')
     ])
     
-    instance_text = "Todas" if dados['instance_id'] == 'all' else f"Instância: {dados['instance_id']}"
+    instance_text = "All" if dados['instance_id'] == 'all' else f"Instance: {dados['instance_id']}"
     action_text = "▶️ START" if dados['action'] == 'start' else "⏸️ STOP"
-    horario_text = dados['horario'].strftime("%H:%M") if dados['horario'] else "Não definido"
+    horario_text = dados['horario'].strftime("%H:%M") if dados['horario'] else "Not set"
     
     await query.edit_message_text(
-        f"📅 PASSO 2: SELECIONE OS DIAS\n\n{instance_text}\nAção: {action_text}\nHorário: {horario_text}",
+        f"📅 STEP 2: SELECT DAYS\n\n{instance_text}\nAction: {action_text}\nTime: {horario_text}",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -442,7 +443,7 @@ async def handle_padrao_dias(query, data):
     user_id = query.from_user.id
     
     if user_id not in user_schedule_data:
-        await query.edit_message_text("❌ Sessão expirada.")
+        await query.edit_message_text("❌ Session expired.")
         return
     
     if data == 'dias_uteis':
@@ -458,39 +459,38 @@ async def mostrar_resumo_agendamento(query):
     user_id = query.from_user.id
     
     if user_id not in user_schedule_data:
-        await query.edit_message_text("❌ Sessão expirada.")
+        await query.edit_message_text("❌ Session expired.")
         return
     
     dados = user_schedule_data[user_id]
-    instance_text = "Todas" if dados['instance_id'] == 'all' else f"Instância: {dados['instance_id']}"
+    instance_text = "All" if dados['instance_id'] == 'all' else f"Instance: {dados['instance_id']}"
     action_text = "▶️ START" if dados['action'] == 'start' else "⏸️ STOP"
-    horario_text = dados['horario'].strftime("%H:%M") if dados['horario'] else "Não definido"
+    horario_text = dados['horario'].strftime("%H:%M") if dados['horario'] else "Not set"
     
-    dias_text = "Não definido"
+    dias_text = "Not set"
     if dados['dias_semana']:
-        nomes_dias = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
-        dias_text = ', '.join([nomes_dias[d] for d in sorted(dados['dias_semana'])])
+        dias_text = ', '.join([WEEKDAYS[d] for d in sorted(dados['dias_semana'])])
     
     completo = dados['horario'] is not None and len(dados['dias_semana']) > 0
     
     keyboard = []
     if not completo:
         if not dados['horario']:
-            keyboard.append([InlineKeyboardButton("⌨️ Digitar Horário", callback_data='voltar_horario')])
+            keyboard.append([InlineKeyboardButton("⌨️ Enter Time", callback_data='voltar_horario')])
         if not dados['dias_semana']:
-            keyboard.append([InlineKeyboardButton("📅 Definir Dias", callback_data='escolher_dias')])
+            keyboard.append([InlineKeyboardButton("📅 Set Days", callback_data='escolher_dias')])
     else:
-        keyboard.append([InlineKeyboardButton("✅ CONFIRMAR", callback_data='confirmar_agendamento')])
+        keyboard.append([InlineKeyboardButton("✅ CONFIRM", callback_data='confirmar_agendamento')])
     
     keyboard.append([
-        InlineKeyboardButton("↩️ Voltar", callback_data='escolher_dias'),
-        InlineKeyboardButton("❌ Cancelar", callback_data='cancelar_agendamento')
+        InlineKeyboardButton("↩️ Back", callback_data='escolher_dias'),
+        InlineKeyboardButton("❌ Cancel", callback_data='cancelar_agendamento')
     ])
     
-    status = "✅ PRONTO" if completo else "⚠️ INCOMPLETO"
+    status = "✅ READY" if completo else "⚠️ INCOMPLETE"
     
     await query.edit_message_text(
-        f"📋 RESUMO\n{status}\n\n{instance_text}\nAção: {action_text}\nHorário: {horario_text}\nDias: {dias_text}",
+        f"📋 SUMMARY\n{status}\n\n{instance_text}\nAction: {action_text}\nTime: {horario_text}\nDays: {dias_text}",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -498,13 +498,13 @@ async def confirmar_agendamento(query, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     
     if user_id not in user_schedule_data:
-        await query.edit_message_text("❌ Sessão expirada.")
+        await query.edit_message_text("❌ Session expired.")
         return
     
     dados = user_schedule_data[user_id]
     
     if not dados['horario'] or not dados['dias_semana']:
-        await query.edit_message_text("❌ Configuração incompleta!")
+        await query.edit_message_text("❌ Incomplete configuration!")
         return
     
     tz = pytz.timezone('America/Sao_Paulo')
@@ -547,24 +547,23 @@ async def confirmar_agendamento(query, context: ContextTypes.DEFAULT_TYPE):
             
             del user_schedule_data[user_id]
             
-            data_formatada = data_agendamento.strftime("%d/%m/%Y às %H:%M")
-            dias_nomes = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
-            dias_text = ', '.join([dias_nomes[d] for d in dados['dias_semana']])
+            data_formatada = data_agendamento.strftime("%d/%m/%Y at %H:%M")
+            dias_text = ', '.join([WEEKDAYS[d] for d in dados['dias_semana']])
             
             await query.edit_message_text(
-                f"✅ AGENDAMENTO CONFIRMADO!\n\n"
-                f"📋 Detalhes:\n"
-                f"• {'Todas' if dados['instance_id'] == 'all' else 'Instância: ' + dados['instance_id']}\n"
-                f"• Ação: {'START' if dados['action'] == 'start' else 'STOP'}\n"
-                f"• Horário: {dados['horario'].strftime('%H:%M')}\n"
-                f"• Dias: {dias_text}\n"
-                f"• Próxima execução: {data_formatada}\n\n"
+                f"✅ SCHEDULE CONFIRMED!\n\n"
+                f"📋 Details:\n"
+                f"• {'All' if dados['instance_id'] == 'all' else 'Instance: ' + dados['instance_id']}\n"
+                f"• Action: {'START' if dados['action'] == 'start' else 'STOP'}\n"
+                f"• Time: {dados['horario'].strftime('%H:%M')}\n"
+                f"• Days: {dias_text}\n"
+                f"• Next execution: {data_formatada}\n\n"
                 f"ID: {schedule_id}\n\n"
-                f"✅ Você será notificado quando executar!"
+                f"✅ You will be notified when executed!"
             )
             return
     
-    await query.edit_message_text("❌ Erro ao calcular data.")
+    await query.edit_message_text("❌ Error calculating date.")
 
 async def handle_instance_action(query, instance_id, action):
     if action == 'start':
@@ -583,21 +582,21 @@ async def handle_instance_action(query, instance_id, action):
                     InlineKeyboardButton("▶️ Start", callback_data=f"instance_{instance_id}_start"),
                     InlineKeyboardButton("⏸️ Stop", callback_data=f"instance_{instance_id}_stop")
                 ],
-                [InlineKeyboardButton("Voltar", callback_data='manage_instances')]
+                [InlineKeyboardButton("Back", callback_data='manage_instances')]
             ]
             await query.edit_message_text(
-                f"Instância: {instance['name']}\nID: {instance_id}\nEstado: {instance['state']}",
+                f"Instance: {instance['name']}\nID: {instance_id}\nState: {instance['state']}",
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
 
 async def start_all_instances(query):
     results = ec2_manager.start_all_instances()
-    message = "Resultados:\n" + "\n".join(results) if results else "Nenhuma instância para iniciar."
+    message = "Results:\n" + "\n".join(results) if results else "No instances to start."
     await query.edit_message_text(message[:4000])
 
 async def stop_all_instances(query):
     results = ec2_manager.stop_all_instances()
-    message = "Resultados:\n" + "\n".join(results) if results else "Nenhuma instância para parar."
+    message = "Results:\n" + "\n".join(results) if results else "No instances to stop."
     await query.edit_message_text(message[:4000])
 
 async def show_schedules(query):
@@ -606,12 +605,12 @@ async def show_schedules(query):
     
     if not schedules:
         keyboard = [
-            [InlineKeyboardButton("↩️ Voltar", callback_data='back_to_main')]
+            [InlineKeyboardButton("↩️ Back", callback_data='back_to_main')]
         ]
-        await query.edit_message_text("📭 Nenhum agendamento encontrado.", reply_markup=InlineKeyboardMarkup(keyboard))
+        await query.edit_message_text("📭 No schedules found.", reply_markup=InlineKeyboardMarkup(keyboard))
         return
     
-    message = "📅 AGENDAMENTOS:\n\n"
+    message = "📅 SCHEDULES:\n\n"
     
     for schedule in schedules:
         schedule_time = schedule['schedule_time']
@@ -623,29 +622,28 @@ async def show_schedules(query):
         
         dias_text = ""
         if 'dias_semana' in schedule and schedule['dias_semana']:
-            nomes_dias = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
             try:
                 dias_numeros = [int(d) for d in schedule['dias_semana'].split(',') if d]
-                dias_text = f"\n• Dias: {', '.join([nomes_dias[d] for d in dias_numeros])}"
+                dias_text = f"\n• Days: {', '.join([WEEKDAYS[d] for d in dias_numeros])}"
             except:
                 pass
         
         message += f"🆔 ID: {schedule['id']}\n"
-        message += f"• Instância: {schedule['instance_id']}\n"
-        message += f"• Ação: {schedule['action'].upper()}\n"
-        message += f"• Horário: {horario_agendamento}\n"
+        message += f"• Instance: {schedule['instance_id']}\n"
+        message += f"• Action: {schedule['action'].upper()}\n"
+        message += f"• Time: {horario_agendamento}\n"
         if dias_text:
             message += dias_text
-        message += f"• Próxima: {schedule_time_local.strftime('%d/%m')}\n"
+        message += f"• Next: {schedule_time_local.strftime('%d/%m')}\n"
         message += "-" * 30 + "\n"
     
     keyboard = []
     for schedule in schedules:
-        keyboard.append([InlineKeyboardButton(f"🗑️ Deletar {schedule['id']}", callback_data=f"delete_schedule_{schedule['id']}")])
+        keyboard.append([InlineKeyboardButton(f"🗑️ Delete {schedule['id']}", callback_data=f"delete_schedule_{schedule['id']}")])
     
     keyboard.append([
-        InlineKeyboardButton("🗑️ Deletar Todos", callback_data='delete_all_schedules'),
-        InlineKeyboardButton("↩️ Voltar", callback_data='back_to_main')
+        InlineKeyboardButton("🗑️ Delete All", callback_data='delete_all_schedules'),
+        InlineKeyboardButton("↩️ Back", callback_data='back_to_main')
     ])
     
     await query.edit_message_text(message, reply_markup=InlineKeyboardMarkup(keyboard))
@@ -668,7 +666,7 @@ def setup_handlers(application: Application):
     conv_handler = ConversationHandler(
         entry_points=[CallbackQueryHandler(pedir_horario_digitado, pattern='^digitar_horario$')],
         states={
-            DIGITAR_HORARIO: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_horario_digitado)]
+            SET_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_horario_digitado)]
         },
         fallbacks=[CommandHandler('cancelar', lambda update, context: ConversationHandler.END)]
     )
