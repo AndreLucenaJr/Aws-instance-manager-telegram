@@ -1,6 +1,7 @@
 import boto3
 from botocore.exceptions import ClientError
 from config import AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION
+import os
 
 class EC2Manager:
     def __init__(self):
@@ -11,6 +12,16 @@ class EC2Manager:
         )
         self.ec2 = self.session.resource('ec2')
         self.client = self.session.client('ec2')
+        self.instances_to_ignore = self._load_ignored_instances()
+    
+    def _load_ignored_instances(self):
+        ignored = os.getenv('INSTANCES_TO_IGNORE', '')
+        if ignored:
+            return [instance_id.strip() for instance_id in ignored.split(',') if instance_id.strip()]
+        return []
+    
+    def _should_ignore_instance(self, instance_id):
+        return instance_id in self.instances_to_ignore
 
     def get_all_instances(self):
         instances = []
@@ -18,15 +29,20 @@ class EC2Manager:
         
         for reservation in response['Reservations']:
             for instance in reservation['Instances']:
-                instances.append({
-                    'id': instance['InstanceId'],
-                    'state': instance['State']['Name'],
-                    'name': next((tag['Value'] for tag in instance.get('Tags', []) if tag['Key'] == 'Name'), 'No Name')
-                })
+                instance_id = instance['InstanceId']
+                if not self._should_ignore_instance(instance_id):
+                    instances.append({
+                        'id': instance_id,
+                        'state': instance['State']['Name'],
+                        'name': next((tag['Value'] for tag in instance.get('Tags', []) if tag['Key'] == 'Name'), 'No Name')
+                    })
         
         return instances
 
     def start_instance(self, instance_id):
+        if self._should_ignore_instance(instance_id):
+            return False, ""
+        
         try:
             instance = self.ec2.Instance(instance_id)
             instance.load()
@@ -40,6 +56,9 @@ class EC2Manager:
             return False, str(e)
 
     def stop_instance(self, instance_id):
+        if self._should_ignore_instance(instance_id):
+            return False, ""
+        
         try:
             instance = self.ec2.Instance(instance_id)
             instance.load()
@@ -49,7 +68,6 @@ class EC2Manager:
             
             instance.stop()
             return True, f"⏳ Stopping Instance {instance_id}"
-
         except ClientError as e:
             return False, str(e)
 
@@ -60,7 +78,8 @@ class EC2Manager:
         for instance in instances:
             if instance['state'] == 'stopped':
                 success, message = self.start_instance(instance['id'])
-                results.append(f"{instance['id']}: {message}")
+                if message:
+                    results.append(f"{instance['id']}: {message}")
             elif instance['state'] == 'running':
                 results.append(f"⚠️ {instance['id']}: Instance is already running")
         
@@ -73,7 +92,8 @@ class EC2Manager:
         for instance in instances:
             if instance['state'] == 'running':
                 success, message = self.stop_instance(instance['id'])
-                results.append(f"{instance['id']}: {message}")
+                if message:
+                    results.append(f"{instance['id']}: {message}")
             elif instance['state'] == 'stopped':
                 results.append(f"⚠️ {instance['id']}: Instance is already stopped")
         

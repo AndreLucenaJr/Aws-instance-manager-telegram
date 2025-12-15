@@ -4,5 +4,5 @@ AWS_SECRET_ACCESS_KEY= ## Add your user aws secret access key
 AWS_REGION= ## Add your aws region
 POSTGRES_URL= postgresql://[user]:[password]@[host]:[port]/[db]
 AUTHORIZED_GROUP_ID= ## ID of the Telegram group in which the bot will be active and respond to messages.
-INSTANCES_TO_IGNORE= ## List of AWS instance IDs that the bot should ignore during processing.
+INSTANCES_TO_IGNORE= ## Comma-separated list of AWS instance IDs that the bot should ignore during processing.
 
