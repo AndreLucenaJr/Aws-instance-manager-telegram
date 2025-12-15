@@ -1,3 +1,10 @@
+
+<p align="center">
+  <img width="208" height="168" alt="AWS EC2 Manager Bot" src="https://github.com/user-attachments/assets/2bb1cf71-b342-4fc2-b743-deb747225a73">
+</p>
+
+
+
 # AWS EC2 Manager Bot
 
 Telegram bot for managing AWS EC2 instances with automatic scheduling.
