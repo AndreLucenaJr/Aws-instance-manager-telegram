@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, time as dt_time
 import pytz
 import re
 import os
-
+from config import TZ_TIMEZONE
 SET_TIME = 0
 
 ec2_manager = EC2Manager()
@@ -53,7 +53,7 @@ async def executar_agendamento(context: ContextTypes.DEFAULT_TYPE):
         horario = schedule.get('horario', '')
         
         if dias_semana and horario:
-            tz = pytz.timezone('America/Sao_Paulo')
+            tz = pytz.timezone(TZ_TIMEZONE)
             agora = datetime.now(tz)
             
             for i in range(1, 8):
@@ -506,7 +506,7 @@ async def confirmar_agendamento(query, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("❌ Incomplete configuration!")
         return
     
-    tz = pytz.timezone('America/Sao_Paulo')
+    tz = pytz.timezone(TZ_TIMEZONE)
     agora = datetime.now(tz)
     
     for i in range(8):
@@ -616,7 +616,7 @@ async def show_schedules(query):
         if isinstance(schedule_time, datetime) and schedule_time.tzinfo is None:
             schedule_time = pytz.UTC.localize(schedule_time)
         
-        schedule_time_local = schedule_time.astimezone(pytz.timezone('America/Sao_Paulo'))
+        schedule_time_local = schedule_time.astimezone(pytz.timezone(TZ_TIMEZONE))
         horario_agendamento = schedule['horario'] if 'horario' in schedule and schedule['horario'] else schedule_time_local.strftime('%H:%M')
         
         dias_text = ""

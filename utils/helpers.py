@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import pytz
+from config import TZ_TIMEZONE
 
 def parse_time_selection(data, chat_id):
     parts = data.split('_')
@@ -11,7 +12,7 @@ def parse_time_selection(data, chat_id):
     instance_id = parts[2]
     action = parts[3]
     
-    tz = pytz.timezone('America/Sao_Paulo')
+    tz = pytz.timezone(TZ_TIMEZONE)
     now = datetime.now(tz)
     
     if time_option.isdigit():

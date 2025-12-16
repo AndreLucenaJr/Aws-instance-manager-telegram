@@ -5,4 +5,4 @@ AWS_REGION= ## Add your aws region
 POSTGRES_URL= postgresql://[user]:[password]@[host]:[port]/[db]
 AUTHORIZED_GROUP_ID= ## ID of the Telegram group in which the bot will be active and respond to messages.
 INSTANCES_TO_IGNORE= ## Comma-separated list of AWS instance IDs that the bot should ignore during processing.
-
+TZ_TIMEZONE= ## A timezone from pytz list. Example: America/New_York

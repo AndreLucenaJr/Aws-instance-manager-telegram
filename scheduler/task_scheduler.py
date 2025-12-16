@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from aws.ec2_manager import EC2Manager
 from database.postgres import get_schedules, delete_schedule, add_schedule
 import pytz
-
+from config import TZ_TIMEZONE
 ec2_manager = EC2Manager()
 
 class Scheduler:
@@ -36,7 +36,7 @@ class Scheduler:
                 dias_lista = [int(d) for d in dias_semana.split(',') if d]
                 hora, minuto = map(int, horario.split(':'))
                 
-                tz = pytz.timezone('America/Sao_Paulo')
+                tz = pytz.timezone(TZ_TIMEZONE)
                 agora = datetime.now(tz)
                 
                 for i in range(1, 8):
