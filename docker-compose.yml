@@ -14,7 +14,8 @@ services:
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_REGION=${AWS_REGION}
-      - INSTANCES_TO_IGNORE==${INSTANCES_TO_IGNORE}
+      - INSTANCES_TO_IGNORE=${INSTANCES_TO_IGNORE}
+      - TZ_TIMEZONE=${TZ_TIMEZONE}
     logging:
       driver: "json-file"
       options:
