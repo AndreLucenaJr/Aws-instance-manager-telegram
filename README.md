@@ -9,10 +9,12 @@
 
 Telegram bot for managing AWS EC2 instances with automatic scheduling.
 
-## Instalação Rápida
+## Quick Installation
 
 ```bash
 git clone git@github.com:AndreLucenaJr/Aws-instance-manager-telegram.git
+python -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 python main.py
 ```

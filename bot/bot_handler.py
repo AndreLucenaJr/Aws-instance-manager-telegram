@@ -14,7 +14,6 @@ AUTHORIZED_GROUP_ID = int(os.getenv('AUTHORIZED_GROUP_ID'))
 user_schedule_data = {}
 
 WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-WEEKDAYS_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 async def verificar_grupo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     return update.effective_chat.type in ['group', 'supergroup'] and update.effective_chat.id == AUTHORIZED_GROUP_ID
