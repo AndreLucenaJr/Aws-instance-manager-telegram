@@ -1,14 +1,12 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters, ConversationHandler
 from aws.ec2_manager import EC2Manager
-from database.postgres import add_schedule, get_schedules, delete_schedule, delete_all_schedules
+from database.postgres import add_schedule, get_schedules, delete_schedule, delete_all_schedules, update_next_schedule_time
 from datetime import datetime, timedelta, time as dt_time
 import pytz
 import re
 import os
-from config import TZ_TIMEZONE
 import warnings
-
 
 warnings.filterwarnings("ignore", message="If 'per_message=False'")
 warnings.filterwarnings("ignore", message="If 'per_message=True'")
@@ -20,6 +18,7 @@ AUTHORIZED_GROUP_ID = int(os.getenv('AUTHORIZED_GROUP_ID'))
 user_schedule_data = {}
 
 WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+WEEKDAYS_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 async def verificar_grupo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     return update.effective_chat.type in ['group', 'supergroup'] and update.effective_chat.id == AUTHORIZED_GROUP_ID
@@ -59,30 +58,36 @@ async def executar_agendamento(context: ContextTypes.DEFAULT_TYPE):
         horario = schedule.get('horario', '')
         
         if dias_semana and horario:
-            tz = pytz.timezone(TZ_TIMEZONE)
+            tz = pytz.timezone('America/Sao_Paulo')
             agora = datetime.now(tz)
             
-            for i in range(1, 8):
+            proxima_data = None
+            for i in range(1, 366):
                 data_teste = agora + timedelta(days=i)
                 dias_numeros = [int(d) for d in dias_semana.split(',') if d]
                 
                 if data_teste.weekday() in dias_numeros:
-                    hora, minuto = map(int, horario.split(':'))
-                    data_agendamento = datetime.combine(data_teste.date(), dt_time(hora, minuto))
-                    data_agendamento = tz.localize(data_agendamento)
-                    data_agendamento_utc = data_agendamento.astimezone(pytz.UTC)
+                    proxima_data = data_teste
+                    break
+            
+            if proxima_data:
+                hora, minuto = map(int, horario.split(':'))
+                data_agendamento = datetime.combine(proxima_data.date(), dt_time(hora, minuto))
+                data_agendamento = tz.localize(data_agendamento)
+                data_agendamento_utc = data_agendamento.astimezone(pytz.UTC)
+                
+                if update_next_schedule_time(schedule['id'], data_agendamento_utc):
+                    schedule['schedule_time'] = data_agendamento_utc
                     
-                    if data_agendamento_utc > datetime.now(pytz.UTC):
-                        atraso = (data_agendamento_utc - datetime.now(pytz.UTC)).total_seconds()
-                        
-                        if context.application and context.application.job_queue:
-                            context.application.job_queue.run_once(
-                                executar_agendamento,
-                                when=atraso,
-                                name=str(schedule['id']),
-                                data=schedule
-                            )
-                        break
+                    atraso = (data_agendamento_utc - datetime.now(pytz.UTC)).total_seconds()
+                    
+                    if atraso > 0 and context.application and context.application.job_queue:
+                        context.application.job_queue.run_once(
+                            executar_agendamento,
+                            when=atraso,
+                            name=str(schedule['id']),
+                            data=schedule
+                        )
         
     except Exception as e:
         print(f"ERROR EXECUTING SCHEDULE: {e}")
@@ -512,7 +517,7 @@ async def confirmar_agendamento(query, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("❌ Incomplete configuration!")
         return
     
-    tz = pytz.timezone(TZ_TIMEZONE)
+    tz = pytz.timezone('America/Sao_Paulo')
     agora = datetime.now(tz)
     
     for i in range(8):
@@ -622,7 +627,7 @@ async def show_schedules(query):
         if isinstance(schedule_time, datetime) and schedule_time.tzinfo is None:
             schedule_time = pytz.UTC.localize(schedule_time)
         
-        schedule_time_local = schedule_time.astimezone(pytz.timezone(TZ_TIMEZONE))
+        schedule_time_local = schedule_time.astimezone(pytz.timezone('America/Sao_Paulo'))
         horario_agendamento = schedule['horario'] if 'horario' in schedule and schedule['horario'] else schedule_time_local.strftime('%H:%M')
         
         dias_text = ""
@@ -673,7 +678,7 @@ def setup_handlers(application: Application):
         states={
             SET_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_horario_digitado)]
         },
-        fallbacks=[CommandHandler('cancelar', lambda update, context: ConversationHandler.END)]
+        fallbacks=[CommandHandler('cancelar', lambda update, context: ConversationHandler.END)],
     )
     
     application.add_handler(conv_handler)
