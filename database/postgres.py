@@ -66,7 +66,6 @@ def check_and_fix_columns():
             else:
                 break
         
-        print("Verificação de colunas concluída!")
         
     except Exception as e:
         print(f"Erro ao verificar/consertar colunas: {e}")

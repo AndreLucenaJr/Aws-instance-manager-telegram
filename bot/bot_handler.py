@@ -7,6 +7,12 @@ import pytz
 import re
 import os
 from config import TZ_TIMEZONE
+import warnings
+
+
+warnings.filterwarnings("ignore", message="If 'per_message=False'")
+warnings.filterwarnings("ignore", message="If 'per_message=True'")
+
 SET_TIME = 0
 
 ec2_manager = EC2Manager()
