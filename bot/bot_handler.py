@@ -18,7 +18,6 @@ AUTHORIZED_GROUP_ID = int(os.getenv('AUTHORIZED_GROUP_ID'))
 user_schedule_data = {}
 
 WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-WEEKDAYS_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 async def verificar_grupo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     return update.effective_chat.type in ['group', 'supergroup'] and update.effective_chat.id == AUTHORIZED_GROUP_ID
@@ -569,7 +568,7 @@ async def confirmar_agendamento(query, context: ContextTypes.DEFAULT_TYPE):
                 f"• Days: {dias_text}\n"
                 f"• Next execution: {data_formatada}\n\n"
                 f"ID: {schedule_id}\n\n"
-                f"✅ You will be notified when executed!"
+                f"✅ You will be notified on the group when executed!"
             )
             return
     
