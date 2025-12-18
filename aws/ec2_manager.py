@@ -30,11 +30,20 @@ class EC2Manager:
         for reservation in response['Reservations']:
             for instance in reservation['Instances']:
                 instance_id = instance['InstanceId']
+                state = instance['State']['Name']
+                
+                if state == 'terminated':
+                    continue
+                
+                instance_name = next((tag['Value'] for tag in instance.get('Tags', []) if tag['Key'] == 'Name'), '')
+                if not instance_name:
+                    continue
+                
                 if not self._should_ignore_instance(instance_id):
                     instances.append({
                         'id': instance_id,
-                        'state': instance['State']['Name'],
-                        'name': next((tag['Value'] for tag in instance.get('Tags', []) if tag['Key'] == 'Name'), 'No Name')
+                        'state': state,
+                        'name': instance_name
                     })
         
         return instances
