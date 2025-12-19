@@ -227,7 +227,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = query.from_user.id
         if user_id in user_schedule_data:
             del user_schedule_data[user_id]
-        await query.edit_message_text("❌ Canceled.")
+        await start_from_callback(update, context)
     elif data == 'escolher_horario':
         await escolher_horario_menu(query)
     elif data == 'escolher_dias':
