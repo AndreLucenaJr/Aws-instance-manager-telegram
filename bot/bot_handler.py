@@ -529,6 +529,10 @@ async def confirmar_agendamento(query, context: ContextTypes.DEFAULT_TYPE):
         if data_teste.weekday() in dados['dias_semana']:
             data_agendamento = datetime.combine(data_teste.date(), dados['horario'])
             data_agendamento = tz.localize(data_agendamento)
+
+            if data_agendamento <= agora:
+                continue
+            
             data_agendamento_utc = data_agendamento.astimezone(pytz.UTC)
             
             schedule_id = add_schedule(
