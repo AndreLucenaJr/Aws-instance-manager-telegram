@@ -198,19 +198,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for job in jobs:
                 job.schedule_removal()
         
-        if delete_schedule(schedule_id, query.from_user.id):
+        if delete_schedule(schedule_id, AUTHORIZED_GROUP_ID):
             await query.edit_message_text(f"✅ Schedule {schedule_id} deleted.")
         else:
             await query.edit_message_text("❌ Could not delete.")
     elif data == 'delete_all_schedules':
-        schedules = get_schedules(query.from_user.id)
+        schedules = get_schedules(AUTHORIZED_GROUP_ID)
         if context.application and context.application.job_queue:
             for schedule in schedules:
                 jobs = context.application.job_queue.get_jobs_by_name(str(schedule['id']))
                 for job in jobs:
                     job.schedule_removal()
         
-        count = delete_all_schedules(query.from_user.id)
+        count = delete_all_schedules(AUTHORIZED_GROUP_ID)
         await query.edit_message_text(f"✅ {count} schedules deleted.")
     elif data == 'back_to_main':
         await start_from_callback(update, context)
@@ -522,6 +522,8 @@ async def confirmar_agendamento(query, context: ContextTypes.DEFAULT_TYPE):
     tz = pytz.timezone('America/Sao_Paulo')
     agora = datetime.now(tz)
     
+    group_id = AUTHORIZED_GROUP_ID
+
     for i in range(8):
         data_teste = agora + timedelta(days=i)
         if data_teste.weekday() in dados['dias_semana']:
@@ -530,7 +532,7 @@ async def confirmar_agendamento(query, context: ContextTypes.DEFAULT_TYPE):
             data_agendamento_utc = data_agendamento.astimezone(pytz.UTC)
             
             schedule_id = add_schedule(
-                chat_id=user_id,
+                group_id=group_id,
                 instance_id=dados['instance_id'],
                 action=dados['action'],
                 schedule_time=data_agendamento_utc,
@@ -540,7 +542,7 @@ async def confirmar_agendamento(query, context: ContextTypes.DEFAULT_TYPE):
             
             schedule_data = {
                 'id': schedule_id,
-                'chat_id': user_id,
+                'chat_id': group_id,
                 'instance_id': dados['instance_id'],
                 'action': dados['action'],
                 'dias_semana': ','.join(map(str, dados['dias_semana'])),
@@ -612,8 +614,8 @@ async def stop_all_instances(query):
     await query.edit_message_text(message[:4000])
 
 async def show_schedules(query):
-    user_id = query.from_user.id
-    schedules = get_schedules(user_id)
+    group_id = AUTHORIZED_GROUP_ID
+    schedules = get_schedules(group_id)
     
     if not schedules:
         keyboard = [

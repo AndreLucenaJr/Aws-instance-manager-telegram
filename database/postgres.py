@@ -74,7 +74,7 @@ def check_and_fix_columns():
         cur.close()
         conn.close()
 
-def add_schedule(chat_id, instance_id, action, schedule_time, dias_semana=None, horario=None, repetir=False):
+def add_schedule(group_id, instance_id, action, schedule_time, dias_semana=None, horario=None, repetir=False):
     conn = psycopg2.connect(POSTGRES_URL)
     cur = conn.cursor()
     
@@ -85,7 +85,7 @@ def add_schedule(chat_id, instance_id, action, schedule_time, dias_semana=None, 
             '''INSERT INTO schedules 
                (chat_id, instance_id, action, schedule_time, dias_semana, horario, repetir) 
                VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id''',
-            (chat_id, instance_id, action, schedule_time, dias_semana, horario, repetir)
+            (group_id, instance_id, action, schedule_time, dias_semana, horario, repetir)
         )
         
         schedule_id = cur.fetchone()[0]
@@ -101,7 +101,7 @@ def add_schedule(chat_id, instance_id, action, schedule_time, dias_semana=None, 
             
             force_recreate_table()
             
-            return add_schedule(chat_id, instance_id, action, schedule_time, dias_semana, horario, repetir)
+            return add_schedule(group_id, instance_id, action, schedule_time, dias_semana, horario, repetir)
         raise
         
     except Exception as e:
@@ -154,13 +154,13 @@ def force_recreate_table():
         cur.close()
         conn.close()
 
-def get_schedules(chat_id=None):
+def get_schedules(group_id=None):
     conn = psycopg2.connect(POSTGRES_URL)
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
-        if chat_id:
-            cur.execute('SELECT * FROM schedules WHERE chat_id = %s ORDER BY schedule_time', (chat_id,))
+        if group_id:
+            cur.execute('SELECT * FROM schedules WHERE chat_id = %s ORDER BY schedule_time', (group_id,))
         else:
             cur.execute('SELECT * FROM schedules ORDER BY schedule_time')
         
@@ -207,11 +207,11 @@ def update_next_schedule_time(schedule_id, next_time):
         cur.close()
         conn.close()
 
-def delete_schedule(schedule_id, chat_id):
+def delete_schedule(schedule_id, group_id):
     conn = psycopg2.connect(POSTGRES_URL)
     cur = conn.cursor()
     try:
-        cur.execute('DELETE FROM schedules WHERE id = %s AND chat_id = %s', (schedule_id, chat_id))
+        cur.execute('DELETE FROM schedules WHERE id = %s AND chat_id = %s', (schedule_id, group_id))
         rows_deleted = cur.rowcount
         conn.commit()
         return rows_deleted > 0
@@ -223,11 +223,11 @@ def delete_schedule(schedule_id, chat_id):
         cur.close()
         conn.close()
 
-def delete_all_schedules(chat_id):
+def delete_all_schedules(group_id):
     conn = psycopg2.connect(POSTGRES_URL)
     cur = conn.cursor()
     try:
-        cur.execute('DELETE FROM schedules WHERE chat_id = %s', (chat_id,))
+        cur.execute('DELETE FROM schedules WHERE chat_id = %s', (group_id,))
         rows_deleted = cur.rowcount
         conn.commit()
         return rows_deleted
