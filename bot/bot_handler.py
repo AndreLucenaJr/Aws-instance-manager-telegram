@@ -81,6 +81,9 @@ async def executar_agendamento(context: ContextTypes.DEFAULT_TYPE):
                     atraso = (data_agendamento_utc - datetime.now(pytz.UTC)).total_seconds()
                     
                     if atraso > 0 and context.application and context.application.job_queue:
+                        existing_jobs = context.application.job_queue.get_jobs_by_name(str(schedule['id']))
+                        for existing_job in existing_jobs:
+                            existing_job.schedule_removal()
                         context.application.job_queue.run_once(
                             executar_agendamento,
                             when=atraso,
